@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 from __future__ import print_function
 
@@ -45,7 +45,7 @@ def get_git_dir (working_dir):
 
     if (hnd.returncode == 0):
         for line in streams[0].splitlines ():
-            git_dir = line + "/.git"
+            git_dir = line.decode() + "/.git"
             break
 
     return git_dir
@@ -89,7 +89,7 @@ def get_packed_objects (git_dir, packs):
 
     packed_objects = {}
 
-    m = re.compile ("[0-9a-f]{40}")
+    m = re.compile (b"[0-9a-f]{40}")
 
     cmd = ["git", "-C", git_dir, "verify-pack", "-v"]
     cmd.extend (packs)
@@ -100,7 +100,7 @@ def get_packed_objects (git_dir, packs):
         for line in streams[0].splitlines ():
             parts = line.split (None)
             if (m.match (parts[0])):
-                if (packed_objects.has_key (parts[0]) == False):
+                if (parts[0] not in packed_objects):
                     packed_objects[parts[0]] = parts
 
 
@@ -114,7 +114,7 @@ def get_unpacked_size (git_dir, object_id):
     if (hnd.returncode == 0):
         object_size = int (streams[0])
     else:
-        log_write ("# ERROR: git-cat-file failed (object_id: " + object_id + ")")
+        log_write ("# ERROR: git-cat-file failed (object_id: " + object_id.decode() + ")")
 
     return object_size
 
@@ -129,7 +129,7 @@ def get_commit_tree (git_dir, commit_id):
     if (hnd.returncode == 0):
         line = streams[0].splitlines ().pop (0)
         parts = line.split (None)
-        if (parts[0] == "tree"):
+        if (parts[0] == b"tree"):
             objects.append ({
                 'type': parts[0],
                 'id':   parts[1]
@@ -137,7 +137,7 @@ def get_commit_tree (git_dir, commit_id):
         else:
             log_write ("# ERROR: cannot find a tree from commit")
     else:
-        log_write ("# ERROR: git-cat-file failed (commit_id: " + commit_id + ")")
+        log_write ("# ERROR: git-cat-file failed (commit_id: " + commit_id.decode() + ")")
 
     return objects
 
@@ -157,7 +157,7 @@ def get_tree_objects (git_dir, tree_id):
                 'id':   parts[2]
             })
     else:
-        log_write ("# ERROR: git-cat-file failed (tree_id: " + tree_id + ")")
+        log_write ("# ERROR: git-cat-file failed (tree_id: " + tree_id.decode() + ")")
 
     return objects
 
@@ -171,7 +171,7 @@ def get_object_size (size, git_dir, object_id):
 
     object_size = 0
 
-    if (packed_objects.has_key (object_id) != False):
+    if (object_id in packed_objects):
         object_size = int (packed_objects[object_id][3])
         size['packed'] = size['packed'] + object_size
     else:
@@ -185,7 +185,7 @@ def object_seen (object_id):
 
     global seen_objects
 
-    if (seen_objects.has_key (object_id) == True):
+    if (object_id in seen_objects):
         return True
     else:
         seen_objects[object_id] = 1
@@ -201,12 +201,12 @@ def get_recursive_size (size, git_dir, object_type, object_id, state):
         # log_write_nln ("# " + str (state['commits']) + "/" + str (state['total_commits']) + " commits done (" + str (state['objects']) + " object(s) found)")
 
         sub_objects = []
-        if (object_type == "commit"):
+        if (object_type == b"commit"):
             sub_objects = get_commit_tree (git_dir, object_id)
-        elif (object_type == "tree"):
+        elif (object_type == b"tree"):
             sub_objects = get_tree_objects (git_dir, object_id)
-        elif (object_type != "blob"):
-            log_write ("# WARNING: unknown object type (" + object_type + ")")
+        elif (object_type != b"blob"):
+            log_write ("# WARNING: unknown object type (" + object_type.decode() + ")")
 
         for sub_object in sub_objects:
             get_recursive_size (size, git_dir, sub_object['type'], sub_object['id'], state)
@@ -257,11 +257,11 @@ total_unpacked_size = 0
 for commit in commits:
     state['commits'] = state['commits'] + 1
     size = { 'packed': 0, 'unpacked': 0 }
-    get_recursive_size (size, git_dir, "commit", commit['id'], state)
+    get_recursive_size (size, git_dir, b"commit", commit['id'], state)
     total_packed_size = total_packed_size + size['packed']
     total_unpacked_size = total_unpacked_size + size['unpacked']
 
-    print (commit['tstamp'] + " " + commit['id'] + " " + str (size['packed'] + size['unpacked']))
+    print (commit['tstamp'].decode() + " " + commit['id'].decode() + " " + str (size['packed'] + size['unpacked']))
 
 
 # Some stats...
